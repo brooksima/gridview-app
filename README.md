@@ -106,7 +106,7 @@ npm run typecheck
 npm run build        # outputs dist/ (static files + service worker + manifest)
 npm run preview      # local check at http://localhost:4173
 ```
-**GitHub Pages (current):** `.github/workflows/pages.yml` builds on every push to `main` with `BASE_PATH=/gridview-app/`, using the repo **Variables** `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. It copies `index.html` to `404.html` as the SPA fallback.
+**GitHub Pages (current):** `./deploy/deploy-gh-pages.sh` builds locally and force-pushes `dist/` to the `gh-pages` branch, which Pages serves. (An Actions version is in `deploy/github-pages-workflow.yml`. Move it to `.github/workflows/` once gh has the `workflow` scope; it builds on every push to `main` with `BASE_PATH=/gridview-app/`, using the repo **Variables** `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. It copies `index.html` to `404.html` as the SPA fallback.
 For a custom domain served at `/`, set `BASE_PATH=/`, add the domain under repo Settings → Pages, and update the Supabase Site URL and redirect URLs.
 
 Host `dist/` on any static host and point `app.gridviewuasservices.com` at it with a CNAME. Configure an SPA fallback so unknown paths serve `index.html`. Free options:
