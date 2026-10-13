@@ -19,12 +19,14 @@ tests/rls.test.mjs       Integration test for RLS/storage against local Supabase
 | Role | Can do |
 |---|---|
 | **owner** | Everything. Approves or denies access requests, assigns customers to a company, creates companies, and sees all photos. Owners can also upload. |
-| **pilot** | Upload photos for any company, see all photos, edit or delete their own photo rows. |
+| **pilot** | Upload photos for any company and see all photos. Edit or delete only their **own** photos (owner: any). |
 | **customer** | Read-only access to photos (and files) of **their assigned company**. |
 
 New sign-ups start as `pending`. Pending and denied users can sign in but only see a waiting or not-approved message. The sign-up form can request `pilot` or `customer`. `owner` is never granted from the form.
 
 ---
+
+**Editing:** the pin sheet has **Edit** (company, territory, circuit, issue, severity, and GPS by dragging the pin or typing lat/lng) and **Delete photo** (with confirmation; removes the row plus the original and thumbnail files). **Account menu → My uploads / All uploads** and **Upload → Fix tags for this batch** allow multi-select bulk changes to company, territory or circuit. The uploader, created time and file paths can't be changed. File access follows the photo row, so moving a photo to another company changes which customers can see it.
 
 ## 1. Create the Supabase project (free)
 1. Go to https://supabase.com, then **New project**. Name it `gridview`, choose a region near Michigan (e.g. *East US (N. Virginia)*), and save the DB password.
