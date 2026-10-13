@@ -7,6 +7,7 @@ import AuthScreens, { SENT_KEY } from './components/AuthScreens';
 import MapView from './components/MapView';
 import UploadView from './components/UploadView';
 import AccessRequests from './components/AccessRequests';
+import MyUploads from './components/MyUploads';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -92,6 +93,7 @@ function Main({ profile, companies, reloadCompanies }: { profile: Profile; compa
   const [requests, setRequests] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [mapKey, setMapKey] = useState(0);
+  const [uploads, setUploads] = useState<string[] | null>(null);
   const myCo = companies.find((c) => c.id === profile.company_id);
   const initials = (profile.full_name || profile.email).split(/\s+/).map((s) => s[0]).slice(0, 2).join('').toUpperCase();
 
@@ -118,14 +120,16 @@ function Main({ profile, companies, reloadCompanies }: { profile: Profile; compa
         <div className="mh"><b>{profile.full_name || profile.email}</b><small>{profile.email}</small></div>
         {profile.role === 'owner' && <button className="mi" onClick={() => { setRequests(true); setMenu(false); }}>
           Access requests {pendingCount > 0 && <span className="cntb">{pendingCount}</span>}</button>}
+ {staff && <button className="mi" onClick={() => { setUploads([]); setMenu(false); }}>{profile.role === 'owner' ? 'All uploads (bulk edit)' : 'My uploads (bulk edit)'}</button>}
         <button className="mi so" onClick={() => supabase.auth.signOut()}>Sign out</button>
       </div>
     </header>
     <div className="view on" onClick={() => menu && setMenu(false)}>
       {tab === 'map' || !staff
         ? <MapView key={mapKey} profile={profile} companies={companies} />
-        : <UploadView profile={profile} companies={companies} onUploaded={() => setMapKey((k) => k + 1)} />}
+        : <UploadView profile={profile} companies={companies} onUploaded={() => setMapKey((k) => k + 1)} onFixBatch={(ids) => setUploads(ids)} />}
     </div>
+    {uploads && <MyUploads profile={profile} companies={companies} preselect={uploads} onClose={() => setUploads(null)} onChanged={() => setMapKey((k) => k + 1)} />}
     {requests && <AccessRequests companies={companies} reloadCompanies={reloadCompanies} onClose={() => setRequests(false)} />}
   </div>;
 }

@@ -4,15 +4,16 @@ import type { Company, Profile, Severity } from '../lib/types';
 import { ISSUE_PRESETS, SEV_COLOR } from '../lib/types';
 import { makeThumb, readMeta, fmtTime } from '../lib/media';
 import { uploadResumable, uploadSmall } from '../lib/upload';
+import { useTagValues } from '../lib/tags';
 
 interface Item {
   key: string; file: File; thumb: Blob | null; thumbUrl: string | null;
   lat: number | null; lng: number | null; takenAt: Date | null;
-  progress: number; state: 'ready' | 'uploading' | 'done' | 'error'; error?: string;
+  progress: number; photoId?: string; state: 'ready' | 'uploading' | 'done' | 'error'; error?: string;
 }
 const CONCURRENCY = 2;
 
-export default function UploadView({ profile, companies, onUploaded }: { profile: Profile; companies: Company[]; onUploaded: () => void }) {
+export default function UploadView({ profile, companies, onUploaded, onFixBatch }: { profile: Profile; companies: Company[]; onUploaded: () => void; onFixBatch: (ids: string[]) => void }) {
   const [company, setCompany] = useState('');
   const [territory, setTerritory] = useState(''); const [circuit, setCircuit] = useState('');
   const [issue, setIssue] = useState(''); const [severity, setSeverity] = useState<Severity>('none');
@@ -20,17 +21,10 @@ export default function UploadView({ profile, companies, onUploaded }: { profile
   const [reading, setReading] = useState(0);
   const [busy, setBusy] = useState(false); const [coErr, setCoErr] = useState(false);
   const [msg, setMsg] = useState('');
-  const [tagVals, setTagVals] = useState<{ territory: string[]; circuit: string[] }>({ territory: [], circuit: [] });
+  const tagVals = useTagValues(company);
   const fileRef = useRef<HTMLInputElement>(null);
   const itemsRef = useRef(items); itemsRef.current = items;
 
-  useEffect(() => {
-    supabase.rpc('photo_tag_values', { p_company: company || null }).then(({ data }) => {
-      const rows = (data ?? []) as { kind: string; value: string }[];
-      const pick = (k: string) => rows.filter((r) => r.kind === k).map((r) => r.value).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-      setTagVals({ territory: pick('territory'), circuit: pick('circuit') });
-    });
-  }, [company]);
 
   // warn before closing the tab mid-upload
   useEffect(() => {
@@ -71,7 +65,7 @@ export default function UploadView({ profile, companies, onUploaded }: { profile
         lat: it.lat, lng: it.lng, taken_at: it.takenAt?.toISOString() ?? null, pilot_id: profile.id,
       });
       if (error) throw error;
-      patch(it.key, { state: 'done', progress: 1 });
+      patch(it.key, { state: 'done', progress: 1, photoId: id });
     } catch (e) {
       patch(it.key, { state: 'error', error: (e as Error).message });
     }
@@ -160,6 +154,8 @@ export default function UploadView({ profile, companies, onUploaded }: { profile
       </div>}
     </>}
     {msg && <div className={msg.includes('failed') ? 'aerr' : 'okmsg'}>{msg}</div>}
+    {!busy && stats.done > 0 && <button className="ab line" onClick={() => onFixBatch(items.filter((i) => i.photoId).map((i) => i.photoId!))}>
+      Fix tags for this batch ({stats.done})</button>}
     <div style={{ height: 90 }} />
     {pending > 0 && <button className="big" disabled={busy} onClick={start}>{busy ? `Uploading… ${stats.pct}%` : `Upload ${pending} photo${pending > 1 ? 's' : ''}`}</button>}
   </div></div>;

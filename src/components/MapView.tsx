@@ -6,6 +6,8 @@ import { supabase, BUCKET } from '../lib/supabase';
 import type { Company, Photo, Profile, Severity } from '../lib/types';
 import { SEV_COLOR, SEV_LABEL, SEV_RANK } from '../lib/types';
 import { fmtTime } from '../lib/media';
+import { canEditPhoto, deletePhoto } from '../lib/tags';
+import EditPhoto from './EditPhoto';
 
 const PAGE = 1000;
 const MAX_ROWS = 20000;
@@ -18,6 +20,7 @@ export default function MapView({ profile, companies }: { profile: Profile; comp
   const [fCo, setFCo] = useState(''); const [fTerr, setFTerr] = useState(''); const [fCir, setFCir] = useState('');
   const [fSev, setFSev] = useState<Severity | ''>(''); const [from, setFrom] = useState(''); const [to, setTo] = useState('');
   const [sel, setSel] = useState<Photo | null>(null);
+  const [editing, setEditing] = useState<Photo | null>(null);
   const [pilots, setPilots] = useState<Record<string, string>>({});
   const mapEl = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -144,7 +147,11 @@ export default function MapView({ profile, companies }: { profile: Profile; comp
       <div><b>{st.noGps}</b><small>No GPS</small></div>
     </div>
     {!loading && !err && photos.length === 0 && <div className="hint">{staff ? 'No photos yet — use Upload to add some.' : 'No inspection photos yet.'}</div>}
-    <Sheet photo={sel} onClose={() => setSel(null)} company={sel ? coName(sel.company_id) : ''} pilot={sel ? pilots[sel.pilot_id] ?? '—' : ''} />
+    <Sheet photo={sel} onClose={() => setSel(null)} company={sel ? coName(sel.company_id) : ''} pilot={sel ? pilots[sel.pilot_id] ?? '—' : ''}
+      canEdit={!!sel && canEditPhoto(profile, sel)} onEdit={() => setEditing(sel)}
+      onDeleted={(id) => { setPhotos((ps) => ps.filter((x) => x.id !== id)); setSel(null); }} />
+    {editing && <EditPhoto photo={editing} companies={companies} onClose={() => setEditing(null)}
+      onSaved={(np) => { setPhotos((ps) => ps.map((x) => (x.id === np.id ? np : x))); setSel(np); setEditing(null); }} />}
   </>;
 }
 
@@ -152,8 +159,12 @@ function uniq(v: (string | null)[]) {
   return [...new Set(v.filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
-function Sheet({ photo, onClose, company, pilot }: { photo: Photo | null; onClose: () => void; company: string; pilot: string }) {
+function Sheet({ photo, onClose, company, pilot, canEdit, onEdit, onDeleted }: { photo: Photo | null; onClose: () => void; company: string; pilot: string;
+  canEdit: boolean; onEdit: () => void; onDeleted: (id: string) => void }) {
   const [thumb, setThumb] = useState<string | null>(null);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [delErr, setDelErr] = useState(''); const [deleting, setDeleting] = useState(false);
+  useEffect(() => { setConfirmDel(false); setDelErr(''); }, [photo?.id]);
   const [full, setFull] = useState<string | null>(null);
   useEffect(() => {
     setThumb(null); setFull(null);
@@ -194,6 +205,20 @@ function Sheet({ photo, onClose, company, pilot }: { photo: Photo | null; onClos
         {photo.has_gps && <a className="btn s" style={{ textDecoration: 'none', color: 'inherit' }} target="_blank" rel="noreferrer"
           href={`https://www.google.com/maps/search/?api=1&query=${photo.lat},${photo.lng}`}>Directions</a>}
       </div>
+      {canEdit && !confirmDel && <div className="btns">
+        <button className="btn s" onClick={onEdit}>✏️ Edit</button>
+        <button className="btn s" style={{ color: '#ff8a8a', borderColor: 'rgba(255,90,90,.5)' }} onClick={() => setConfirmDel(true)}>🗑 Delete photo</button>
+      </div>}
+      {canEdit && confirmDel && <div className="card" style={{ marginTop: 14, borderColor: 'rgba(255,90,90,.6)' }}>
+        <b>Delete this photo?</b><div className="sub">The photo and its thumbnail are removed permanently. This can't be undone.</div>
+        {delErr && <div className="aerr">{delErr}</div>}
+        <div className="btns" style={{ marginTop: 10 }}>
+          <button className="btn" style={{ background: '#ff3b3b', color: '#fff' }} disabled={deleting} onClick={async () => {
+            setDeleting(true); setDelErr('');
+            try { await deletePhoto(photo); onDeleted(photo.id); } catch (e) { setDelErr((e as Error).message); } finally { setDeleting(false); }
+          }}>{deleting ? 'Deleting…' : 'Delete'}</button>
+          <button className="btn s" onClick={() => setConfirmDel(false)}>Cancel</button>
+        </div></div>}
     </>}
   </div>;
 }

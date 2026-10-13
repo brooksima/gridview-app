@@ -114,8 +114,48 @@ ok((await sneaky.c.from('photos').select('id')).data.length === 0, 'denied user 
 ok((await client().from('photos').select('id')).data?.length === 0, 'anon sees no photos');
 rows = (await P.from('photos').select('id')).data;
 ok(rows.length >= 2, 'pilot sees all companies');
+
+console.log('Photo editing');
+const pilot2 = await signup('pilot2', { full_name: 'Pia Pilot', requested_role: 'pilot' });
+await O.from('profiles').update({ status: 'approved', role: 'pilot' }).eq('id', pilot2.id);
+const P2 = pilot2.c;
+const dteRow = (await P.from('photos').select('*').eq('storage_path', dtePath).single()).data;
+r = await P.from('photos').update({ circuit: 'Cir. 99', lat: 41.8, lng: -83.5 }).eq('id', dteRow.id).select();
+ok(!r.error && r.data[0]?.circuit === 'Cir. 99' && r.data[0]?.has_gps, 'pilot edits own photo (circuit + GPS)');
+r = await P2.from('photos').update({ circuit: 'hack' }).eq('id', dteRow.id).select();
+ok(!r.error && r.data.length === 0, "pilot cannot edit another pilot's photo");
+r = await custA.c.from('photos').update({ circuit: 'hack' }).eq('id', dteRow.id).select();
+ok(!r.error && r.data.length === 0, 'customer cannot edit photos');
+r = await P.from('photos').update({ pilot_id: pilot2.id }).eq('id', dteRow.id);
+ok(!!r.error, 'uploader (pilot_id) is immutable');
+r = await P.from('photos').update({ created_at: '2020-01-01T00:00:00Z' }).eq('id', dteRow.id);
+ok(!!r.error, 'created_at is immutable');
+r = await O.from('photos').update({ storage_path: 'x/y.jpg' }).eq('id', dteRow.id);
+ok(!!r.error, 'storage_path immutable even for owner');
+r = await O.from('photos').update({ severity: 'high' }).eq('id', dteRow.id).select();
+ok(!r.error && r.data[0]?.severity === 'high', 'owner edits any photo');
+// bulk move to another company → access follows the row
+r = await P.from('photos').update({ company_id: co['Consumers Energy'], territory: 'Moved' }).in('id', [dteRow.id]).select('id');
+ok(!r.error && r.data.length === 1, 'pilot bulk-moves own photo to another company');
+ok((await custA.c.storage.from('photos').createSignedUrl(dtePath, 60)).error, 'old company customer loses file access after move');
+ok(!(await custB.c.storage.from('photos').createSignedUrl(dtePath, 60)).error, 'new company customer gains file access after move');
+ok((await custB.c.from('photos').select('id').eq('id', dteRow.id)).data.length === 1, 'new company customer sees moved row');
+// deletes
+r = await P2.storage.from('photos').remove([dtePath]);
+ok(r.data?.length === 0, "pilot cannot delete another pilot's file");
+r = await P2.from('photos').delete().eq('id', dteRow.id).select();
+ok(r.data?.length === 0, "pilot cannot delete another pilot's row");
+r = await custB.c.from('photos').delete().eq('id', dteRow.id).select();
+ok(r.data?.length === 0, 'customer cannot delete photos');
 r = await P.storage.from('photos').remove([dtePath]);
-ok(r.data?.length === 0, 'pilot cannot delete storage objects (owner only)');
+ok(r.data?.length === 1, 'pilot deletes own file');
+r = await P.from('photos').delete().eq('id', dteRow.id).select();
+ok(r.data?.length === 1, 'pilot deletes own row');
+const consRow = (await O.from('photos').select('*').eq('storage_path', consPath).single()).data;
+r = await O.storage.from('photos').remove([consPath]);
+ok(r.data?.length === 1, "owner deletes another pilot's file");
+r = await O.from('photos').delete().eq('id', consRow.id).select();
+ok(r.data?.length === 1, "owner deletes another pilot's row");
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
