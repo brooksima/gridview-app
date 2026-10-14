@@ -26,6 +26,7 @@ export const ISSUE_PRESETS: { issue: string; severity: Severity }[] = [
   { issue: 'Broken crossarm', severity: 'high' },
   { issue: 'Cracked insulator', severity: 'medium' },
   { issue: 'Leaning pole', severity: 'medium' },
+  { issue: 'Pole top', severity: 'medium' },
   { issue: 'Vegetation contact', severity: 'low' },
   { issue: 'Bird nest', severity: 'low' },
 ];
