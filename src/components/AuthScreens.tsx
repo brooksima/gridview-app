@@ -1,4 +1,4 @@
-import { LOGO, APP_URL } from '../lib/base';
+import { LOGO, APP_URL, WEBSITE_URL, WEBSITE_LABEL } from '../lib/base';
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { SIGNUP_COMPANIES } from '../lib/types';
@@ -12,13 +12,15 @@ export default function AuthScreens() {
   const [sentTo, setSentTo] = useState(initialSent);
   return <div className="auth on">
     {scr === 'welcome' && <div className="ascr on">
-      <div className="wlogo"><img src={LOGO} alt="GridView UAS Services LLC" /></div>
+      <a className="webback" href={WEBSITE_URL}>‹ Back to website</a>
+      <a className="wlogo" href={WEBSITE_URL} title="GridView UAS Services website" style={{ display: 'block' }}><img src={LOGO} alt="GridView UAS Services LLC" /></a>
       <div className="wtag">See it before it fails.</div>
       <div className="wsub">Drone inspections for electric distribution · Temperance, MI</div>
       <button className="ab gold" onClick={() => setScr('pilot')}>Pilot sign in</button>
       <button className="ab line" onClick={() => setScr('customer')}>Customer sign in</button>
       <div className="asmall" style={{ marginTop: 14, fontSize: 13.5, color: 'var(--txt)' }}>
         New to GridView? <a href="#" className="lnk" onClick={(e) => { e.preventDefault(); setScr('signup'); }}>Request access / Sign up</a></div>
+      <div className="asmall" style={{ marginTop: 18 }}><a className="lnk" href={WEBSITE_URL}>🌐 {WEBSITE_LABEL}</a></div>
       <div className="asmall">Customers are utilities — e.g. DTE, Consumers Energy, Toledo Edison and electric co-ops.</div>
     </div>}
     {(scr === 'pilot' || scr === 'customer') && <SignIn kind={scr} back={() => setScr('welcome')} forgot={() => setScr('forgot')} signup={() => setScr('signup')} />}

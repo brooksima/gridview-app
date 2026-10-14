@@ -1,4 +1,4 @@
-import { LOGO } from './lib/base';
+import { LOGO, WEBSITE_URL } from './lib/base';
 import { useCallback, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, configured } from './lib/supabase';
@@ -121,6 +121,7 @@ function Main({ profile, companies, reloadCompanies }: { profile: Profile; compa
         {profile.role === 'owner' && <button className="mi" onClick={() => { setRequests(true); setMenu(false); }}>
           Access requests {pendingCount > 0 && <span className="cntb">{pendingCount}</span>}</button>}
  {staff && <button className="mi" onClick={() => { setUploads([]); setMenu(false); }}>{profile.role === 'owner' ? 'All uploads (bulk edit)' : 'My uploads (bulk edit)'}</button>}
+        <a className="mi" href={WEBSITE_URL} style={{ textDecoration: 'none', color: 'inherit' }}>🌐 GridView website</a>
         <button className="mi so" onClick={() => supabase.auth.signOut()}>Sign out</button>
       </div>
     </header>

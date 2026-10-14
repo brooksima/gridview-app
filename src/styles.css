@@ -138,3 +138,4 @@ h3{font-size:18px;margin:12px 0 2px}.sub{color:var(--mut);font-size:12.5px}
 .page .big{position:sticky;left:auto;right:auto;width:100%;bottom:calc(18px + env(safe-area-inset-bottom))}
 .fdate{font:inherit;font-size:12.5px;font-weight:600;padding:6px 10px;border-radius:999px;background:rgba(10,49,80,.95);border:1px solid rgba(142,160,196,.3);color:var(--txt);flex:none;color-scheme:dark}
 .fdate.act{border-color:var(--gold)}
+.webback{position:absolute;top:calc(env(safe-area-inset-top) + 14px);left:18px;color:var(--gold);font-size:13.5px;font-weight:700;text-decoration:none;padding:6px 10px;border:1px solid rgba(235,181,74,.45);border-radius:999px;background:rgba(10,49,80,.6)}
