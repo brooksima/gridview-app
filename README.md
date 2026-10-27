@@ -138,3 +138,11 @@ npx supabase functions serve notify-signup --env-file ./supabase/.env.local
 - **Storage limits:** the free tier includes 1 GB of storage. A drone photo is about 5–10 MB, so that is roughly 100–200 photos. Supabase Pro ($25/mo, 100 GB) is the next step. The bucket's per-file limit is 100 MB, and the project's global upload limit (Storage settings, default 50 MB on Free) also applies.
 - **Map:** loads up to 20,000 photo rows client-side. Beyond that, add server-side filtering.
 - **Paused projects:** free Supabase projects pause after 1 week with no activity.
+
+## Public live demo
+
+`https://app.gridviewuasservices.com/demo/` (also `/#/demo`) is a no-login, read-only map of the **Demo** company only.
+It uses a separate always-anonymous Supabase client; access is enforced by RLS
+(`supabase/migrations/20261027190000_public_demo.sql`): anon may SELECT `photos` rows whose `company_id` is the Demo
+company's id and read storage objects in that company's folder that belong to a Demo photo row. Anon has no
+insert/update/delete policies. Check with `tests/demo-anon.sh` (logged out) and `tests/rls-roles-sim.sql` (all roles, rolled back).

@@ -7,7 +7,7 @@ export BASE_PATH="${BASE_PATH:-/}"
 export VITE_WEBSITE_URL="${VITE_WEBSITE_URL:-https://gridviewuasservices.com}"
 CUSTOM_DOMAIN="${CUSTOM_DOMAIN:-app.gridviewuasservices.com}"
 npm run build
-cp dist/index.html dist/404.html && touch dist/.nojekyll
+cp dist/index.html dist/404.html && mkdir -p dist/demo && cp dist/index.html dist/demo/index.html && touch dist/.nojekyll
 [ -n "$CUSTOM_DOMAIN" ] && echo "$CUSTOM_DOMAIN" > dist/CNAME
 cd dist && rm -rf .git && git init -q -b gh-pages && git add -A \
   && git -c user.name="GridView deploy" -c user.email="matt@gridviewuasservices.com" commit -qm "Deploy $(date -u +%FT%TZ)" \

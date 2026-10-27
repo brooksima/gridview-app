@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase, BUCKET } from '../lib/supabase';
 import type { Company, Photo, Profile, Severity } from '../lib/types';
 import { SEV_COLOR, SEV_LABEL, SEV_RANK } from '../lib/types';
@@ -12,8 +13,8 @@ import EditPhoto from './EditPhoto';
 const PAGE = 1000;
 const MAX_ROWS = 20000;
 
-export default function MapView({ profile, companies }: { profile: Profile; companies: Company[] }) {
-  const staff = profile.role !== 'customer';
+export default function MapView({ profile, companies, db = supabase, demo = false }: { profile: Profile; companies: Company[]; db?: SupabaseClient; demo?: boolean }) {
+  const staff = !demo && profile.role !== 'customer';
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true); const [err, setErr] = useState('');
   const [q, setQ] = useState('');
@@ -33,7 +34,7 @@ export default function MapView({ profile, companies }: { profile: Profile; comp
     (async () => {
       const all: Photo[] = [];
       for (let off = 0; off < MAX_ROWS; off += PAGE) {
-        const { data, error } = await supabase.from('photos').select('*').order('taken_at', { ascending: false, nullsFirst: false }).range(off, off + PAGE - 1);
+        const { data, error } = await db.from('photos').select('*').order('taken_at', { ascending: false, nullsFirst: false }).range(off, off + PAGE - 1);
         if (error) { if (!cancel) setErr(error.message); break; }
         all.push(...(data as Photo[]));
         if (!data || data.length < PAGE) break;
@@ -41,13 +42,13 @@ export default function MapView({ profile, companies }: { profile: Profile; comp
       if (cancel) return;
       setPhotos(all); setLoading(false);
       const ids = [...new Set(all.map((p) => p.pilot_id))];
-      if (ids.length) {
-        const { data } = await supabase.rpc('pilot_names', { ids });
+      if (ids.length && !demo) {
+        const { data } = await db.rpc('pilot_names', { ids });
         if (!cancel && data) setPilots(Object.fromEntries((data as { id: string; full_name: string }[]).map((r) => [r.id, r.full_name])));
       }
     })();
     return () => { cancel = true; };
-  }, []);
+  }, [db, demo]);
 
   // init map
   useEffect(() => {
@@ -146,11 +147,11 @@ export default function MapView({ profile, companies }: { profile: Profile; comp
       <div><b style={{ color: SEV_COLOR.high }}>{st.high}</b><small>High</small></div>
       <div><b>{st.noGps}</b><small>No GPS</small></div>
     </div>
-    {!loading && !err && photos.length === 0 && <div className="hint">{staff ? 'No photos yet — use Upload to add some.' : 'No inspection photos yet.'}</div>}
-    <Sheet photo={sel} onClose={() => setSel(null)} company={sel ? coName(sel.company_id) : ''} pilot={sel ? pilots[sel.pilot_id] ?? '—' : ''}
-      canEdit={!!sel && canEditPhoto(profile, sel)} onEdit={() => setEditing(sel)}
+    {!loading && !err && photos.length === 0 && <div className="hint">{demo ? 'Demo data is unavailable right now — please try again shortly.' : staff ? 'No photos yet — use Upload to add some.' : 'No inspection photos yet.'}</div>}
+    <Sheet db={db} photo={sel} onClose={() => setSel(null)} company={sel ? coName(sel.company_id) : ''} pilot={demo ? 'GridView UAS crew' : sel ? pilots[sel.pilot_id] ?? '—' : ''}
+      canEdit={!demo && !!sel && canEditPhoto(profile, sel)} onEdit={() => setEditing(sel)}
       onDeleted={(id) => { setPhotos((ps) => ps.filter((x) => x.id !== id)); setSel(null); }} />
-    {editing && <EditPhoto photo={editing} companies={companies} onClose={() => setEditing(null)}
+    {!demo && editing && <EditPhoto photo={editing} companies={companies} onClose={() => setEditing(null)}
       onSaved={(np) => { setPhotos((ps) => ps.map((x) => (x.id === np.id ? np : x))); setSel(np); setEditing(null); }} />}
   </>;
 }
@@ -159,7 +160,7 @@ function uniq(v: (string | null)[]) {
   return [...new Set(v.filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
-function Sheet({ photo, onClose, company, pilot, canEdit, onEdit, onDeleted }: { photo: Photo | null; onClose: () => void; company: string; pilot: string;
+function Sheet({ db, photo, onClose, company, pilot, canEdit, onEdit, onDeleted }: { db: SupabaseClient; photo: Photo | null; onClose: () => void; company: string; pilot: string;
   canEdit: boolean; onEdit: () => void; onDeleted: (id: string) => void }) {
   const [thumb, setThumb] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -171,13 +172,13 @@ function Sheet({ photo, onClose, company, pilot, canEdit, onEdit, onDeleted }: {
     if (!photo) return;
     let cancel = false;
     const paths = [photo.storage_path, ...(photo.thumb_path ? [photo.thumb_path] : [])];
-    supabase.storage.from(BUCKET).createSignedUrls(paths, 3600).then(({ data }) => {
+    db.storage.from(BUCKET).createSignedUrls(paths, 3600).then(({ data }) => {
       if (cancel || !data) return;
       setFull(data[0]?.signedUrl ?? null);
       setThumb(data[1]?.signedUrl ?? data[0]?.signedUrl ?? null);
     });
     return () => { cancel = true; };
-  }, [photo]);
+  }, [photo, db]);
   const s = photo?.severity ?? 'none';
   return <div className={'sheet' + (photo ? ' open' : '')}>
     <div className="grab" /><button className="x" onClick={onClose} aria-label="Close">✕</button>

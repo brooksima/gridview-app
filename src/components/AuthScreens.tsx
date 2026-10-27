@@ -1,4 +1,4 @@
-import { LOGO, APP_URL, WEBSITE_URL, WEBSITE_LABEL } from '../lib/base';
+import { BASE, LOGO, APP_URL, WEBSITE_URL, WEBSITE_LABEL } from '../lib/base';
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { SIGNUP_COMPANIES } from '../lib/types';
@@ -18,6 +18,7 @@ export default function AuthScreens() {
       <div className="wsub">Drone inspections for electric distribution · Temperance, MI</div>
       <button className="ab gold" onClick={() => setScr('pilot')}>Pilot sign in</button>
       <button className="ab line" onClick={() => setScr('customer')}>Customer sign in</button>
+      <a className="ab demo-cta" href={`${BASE}demo/`}><span className="livedot" />View live demo <small>no login needed</small></a>
       <div className="asmall" style={{ marginTop: 14, fontSize: 13.5, color: 'var(--txt)' }}>
         New to GridView? <a href="#" className="lnk" onClick={(e) => { e.preventDefault(); setScr('signup'); }}>Request access / Sign up</a></div>
       <div className="asmall" style={{ marginTop: 18 }}><a className="lnk" href={WEBSITE_URL}>🌐 {WEBSITE_LABEL}</a></div>
