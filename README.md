@@ -146,3 +146,9 @@ It uses a separate always-anonymous Supabase client; access is enforced by RLS
 (`supabase/migrations/20261027190000_public_demo.sql`): anon may SELECT `photos` rows whose `company_id` is the Demo
 company's id and read storage objects in that company's folder that belong to a Demo photo row. Anon has no
 insert/update/delete policies. Check with `tests/demo-anon.sh` (logged out) and `tests/rls-roles-sim.sql` (all roles, rolled back).
+
+## Pole grouping and nadir photos
+- The map (logged-in app and public demo) groups GPS photos that are within ~15 m of each other, within the same company, into one **pole marker** (`src/lib/poles.ts`, single-linkage on a spatial grid). The marker color is the worst severity among the pole's photos that pass the current filters, and the badge shows the photo count.
+- Tapping a pole opens a panel with a main photo and a thumbnail strip. Tap a thumbnail, swipe, or use the ‹ › arrows or arrow keys to switch photos; the finding, severity and details follow the selected photo.
+- The main photo is the **nadir** shot (`photos.gimbal_pitch` ≤ -75°, i.e. DJI XMP `GimbalPitchDegree` near -90; visual is preferred over thermal). If there's no nadir, it's the worst-severity finding, else the first visual photo.
+- `gimbal_pitch` / `is_thermal` (migration `20261027230000_photo_gimbal.sql`) are read from DJI XMP at upload time. Demo rows were backfilled from the photos' own XMP or a simultaneous wide/zoom/thermal frame of the same capture. No RLS changes were needed.

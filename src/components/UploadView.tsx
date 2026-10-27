@@ -8,7 +8,7 @@ import { useTagValues } from '../lib/tags';
 
 interface Item {
   key: string; file: File; thumb: Blob | null; thumbUrl: string | null;
-  lat: number | null; lng: number | null; takenAt: Date | null;
+  lat: number | null; lng: number | null; takenAt: Date | null; pitch: number | null; thermal: boolean;
   progress: number; photoId?: string; state: 'ready' | 'uploading' | 'done' | 'error'; error?: string;
 }
 const CONCURRENCY = 2;
@@ -43,7 +43,7 @@ export default function UploadView({ profile, companies, onUploaded, onFixBatch 
     for (const file of list) {
       const [meta, thumb] = await Promise.all([readMeta(file), makeThumb(file)]);
       const it: Item = { key: crypto.randomUUID(), file, thumb, thumbUrl: thumb ? URL.createObjectURL(thumb) : null,
-        lat: meta.lat, lng: meta.lng, takenAt: meta.takenAt, progress: 0, state: 'ready' };
+        lat: meta.lat, lng: meta.lng, takenAt: meta.takenAt, pitch: meta.pitch, thermal: meta.thermal, progress: 0, state: 'ready' };
       setItems((prev) => [...prev, it]); setReading((r) => r - 1);
     }
   };
@@ -63,6 +63,7 @@ export default function UploadView({ profile, companies, onUploaded, onFixBatch 
         id, company_id: company, territory: territory.trim() || null, circuit: circuit.trim() || null,
         issue: issue.trim() || null, severity, storage_path: path, thumb_path: thumbPath, original_name: it.file.name,
         lat: it.lat, lng: it.lng, taken_at: it.takenAt?.toISOString() ?? null, pilot_id: profile.id,
+        gimbal_pitch: it.pitch, is_thermal: it.thermal,
       });
       if (error) throw error;
       patch(it.key, { state: 'done', progress: 1, photoId: id });

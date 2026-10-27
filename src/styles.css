@@ -154,3 +154,23 @@ h3{font-size:18px;margin:12px 0 2px}.sub{color:var(--mut);font-size:12.5px}
 @media (min-width:700px){.dintro{max-width:420px;left:16px;right:auto}}
 .ab.demo-cta{display:flex;align-items:center;justify-content:center;gap:9px;border:1.5px solid rgba(61,220,132,.6);color:#bff5d6;background:rgba(61,220,132,.08);text-decoration:none}
 .ab.demo-cta small{font-size:11.5px;font-weight:600;color:var(--mut)}
+
+/* ---- pole markers + pole photo panel ---- */
+.pole{position:relative;width:26px;height:26px}
+.pole .pc{position:absolute;top:-9px;right:-11px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#0b1a33;color:#fff;border:1.5px solid #fff;font:800 10.5px/15px system-ui,sans-serif;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.6)}
+.photo.main{display:block;height:min(240px,34vh);touch-action:pan-y}
+.photo.main .mainlink{position:absolute;inset:0;display:grid;place-items:center;color:var(--mut)}
+.photo.main img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.photo.main img.hi{opacity:0;transition:opacity .25s}.photo.main img.hi.on{opacity:1}
+.photo.main .bad{z-index:2}
+.ptag{position:absolute;z-index:2;left:10px;bottom:10px;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(6,16,34,.78);color:#e6f2ff}
+.pcnt{position:absolute;z-index:2;right:10px;bottom:10px;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(6,16,34,.78);color:#e6f2ff;font-variant-numeric:tabular-nums}
+.nav{position:absolute;z-index:2;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(6,16,34,.6);color:#fff;font-size:24px;line-height:32px;border:1px solid rgba(255,255,255,.25);padding:0}
+.nav.l{left:8px}.nav.r{right:8px}
+.strip{display:flex;gap:8px;overflow-x:auto;padding:10px 2px 4px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.th{position:relative;flex:0 0 auto;width:68px;height:51px;border-radius:9px;overflow:hidden;padding:0;border:2px solid transparent;background:#0d3352;scroll-snap-align:center;opacity:.78}
+.th.on{border-color:var(--gold);opacity:1}
+.th img{width:100%;height:100%;object-fit:cover;display:block}
+.th .sv{position:absolute;top:4px;left:4px;width:10px;height:10px;border-radius:50%;border:1.5px solid #fff}
+.th em{position:absolute;right:3px;bottom:3px;font-style:normal;font-size:9.5px;font-weight:800;padding:1px 4px;border-radius:4px;background:rgba(6,16,34,.8);color:#fff}
+@media (min-width:700px){.photo.main{height:300px}.th{width:80px;height:60px}}

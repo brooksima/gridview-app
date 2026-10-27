@@ -14,6 +14,7 @@ export interface Photo {
   issue: string | null; severity: Severity; storage_path: string; thumb_path: string | null;
   original_name: string | null; lat: number | null; lng: number | null; has_gps: boolean;
   taken_at: string | null; pilot_id: string; created_at: string;
+  gimbal_pitch: number | null; is_thermal: boolean;
 }
 
 export const SIGNUP_COMPANIES = ['DTE Energy', 'Consumers Energy', 'Toledo Edison (FirstEnergy)', 'Hancock-Wood Electric Co-op', 'Other'];

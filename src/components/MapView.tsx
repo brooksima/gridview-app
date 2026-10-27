@@ -9,6 +9,7 @@ import { SEV_COLOR, SEV_LABEL, SEV_RANK } from '../lib/types';
 import { fmtTime } from '../lib/media';
 import { canEditPhoto, deletePhoto } from '../lib/tags';
 import EditPhoto from './EditPhoto';
+import { groupPoles, pickMain, isNadir, type Pole } from '../lib/poles';
 
 const PAGE = 1000;
 const MAX_ROWS = 20000;
@@ -20,7 +21,7 @@ export default function MapView({ profile, companies, db = supabase, demo = fals
   const [q, setQ] = useState('');
   const [fCo, setFCo] = useState(''); const [fTerr, setFTerr] = useState(''); const [fCir, setFCir] = useState('');
   const [fSev, setFSev] = useState<Severity | ''>(''); const [from, setFrom] = useState(''); const [to, setTo] = useState('');
-  const [sel, setSel] = useState<Photo | null>(null);
+  const [selId, setSelId] = useState<string | null>(null); // selected photo; its pole is derived
   const [editing, setEditing] = useState<Photo | null>(null);
   const [pilots, setPilots] = useState<Record<string, string>>({});
   const mapEl = useRef<HTMLDivElement>(null);
@@ -91,17 +92,30 @@ export default function MapView({ profile, companies, db = supabase, demo = fals
     });
   }, [scoped, q, fTerr, fCir, fSev, from, to]);
 
-  // draw markers
+  // group photos taken around the same pole (per company) into one marker
+  const poles = useMemo(() => groupPoles(scoped), [scoped]);
+  const poleOf = useMemo(() => { const m = new Map<string, Pole>(); poles.forEach((pl) => pl.photos.forEach((ph) => m.set(ph.id, pl))); return m; }, [poles]);
+  const visible = useMemo(() => {
+    const ok = new Set(filtered.map((p) => p.id));
+    return poles.map((pl) => ({ pole: pl, hits: pl.photos.filter((ph) => ok.has(ph.id)) })).filter((v) => v.hits.length);
+  }, [poles, filtered]);
+  const selPole = selId ? poleOf.get(selId) ?? null : null;
+  const sel = selPole?.photos.find((p) => p.id === selId) ?? null;
+
+  // draw markers (one per pole)
   useEffect(() => {
     const cluster = clusterRef.current, map = mapRef.current;
     if (!cluster || !map) return;
     cluster.clearLayers();
-    const markers = filtered.filter((p) => p.has_gps).map((p) => {
-      const m = L.marker([p.lat!, p.lng!], {
-        sev: p.severity,
-        icon: L.divIcon({ className: '', html: `<div class="pin" style="background:${SEV_COLOR[p.severity]}"></div>`, iconSize: [26, 26], iconAnchor: [13, 30] }),
+    const markers = visible.map(({ pole, hits }) => {
+      const sev = hits.reduce<Severity>((w, p) => (SEV_RANK[p.severity] > SEV_RANK[w] ? p.severity : w), 'none');
+      const n = pole.photos.length;
+      const m = L.marker([pole.lat, pole.lng], {
+        sev, title: `${n} photo${n === 1 ? '' : 's'}`,
+        icon: L.divIcon({ className: '', iconSize: [26, 26], iconAnchor: [13, 30],
+          html: `<div class="pole" data-pole="${pole.id}" data-n="${n}" data-sev="${sev}"><div class="pin" style="background:${SEV_COLOR[sev]}"></div>${n > 1 ? `<span class="pc">${n}</span>` : ''}</div>` }),
       } as L.MarkerOptions);
-      m.on('click', () => setSel(p));
+      m.on('click', () => setSelId((hits.length === pole.photos.length ? pole.main : pickMain(hits)).id));
       return m;
     });
     cluster.addLayers(markers);
@@ -109,11 +123,11 @@ export default function MapView({ profile, companies, db = supabase, demo = fals
       map.fitBounds(cluster.getBounds(), { padding: [40, 40], maxZoom: 17 });
       fittedRef.current = true;
     }
-  }, [filtered, q, fTerr, fCir, fCo]);
+  }, [visible, q, fTerr, fCir, fCo]);
 
   const coName = (id: string) => companies.find((c) => c.id === id)?.name ?? '—';
   const st = {
-    pins: filtered.filter((p) => p.has_gps).length,
+    poles: visible.length,
     issues: filtered.filter((p) => p.severity !== 'none').length,
     high: filtered.filter((p) => p.severity === 'high').length,
     noGps: filtered.filter((p) => !p.has_gps).length,
@@ -139,20 +153,23 @@ export default function MapView({ profile, companies, db = supabase, demo = fals
         <input type="date" className={'fdate' + (to ? ' act' : '')} value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" />
       </div>
       <div className="res">{loading ? 'Loading photos…' : err ? <span style={{ color: '#ff8a8a' }}>{err}</span>
-        : <><b>{filtered.length}</b> photos{filtered.length !== photos.length ? ` (of ${photos.length})` : ''}</>}</div>
+        : <><b>{filtered.length}</b> photos{filtered.length !== photos.length ? ` (of ${photos.length})` : ''} · <b>{st.poles}</b> pole{st.poles === 1 ? '' : 's'}</>}</div>
     </div>
     <div className="stats">
-      <div><b>{st.pins}</b><small>On map</small></div>
+      <div><b>{st.poles}</b><small>Poles</small></div>
       <div><b style={{ color: SEV_COLOR.medium }}>{st.issues}</b><small>Issues</small></div>
       <div><b style={{ color: SEV_COLOR.high }}>{st.high}</b><small>High</small></div>
       <div><b>{st.noGps}</b><small>No GPS</small></div>
     </div>
     {!loading && !err && photos.length === 0 && <div className="hint">{demo ? 'Demo data is unavailable right now — please try again shortly.' : staff ? 'No photos yet — use Upload to add some.' : 'No inspection photos yet.'}</div>}
-    <Sheet db={db} photo={sel} onClose={() => setSel(null)} company={sel ? coName(sel.company_id) : ''} pilot={demo ? 'GridView UAS crew' : sel ? pilots[sel.pilot_id] ?? '—' : ''}
+    <Sheet db={db} pole={selPole} photo={sel} onPick={setSelId} onClose={() => setSelId(null)} company={sel ? coName(sel.company_id) : ''} pilot={demo ? 'GridView UAS crew' : sel ? pilots[sel.pilot_id] ?? '—' : ''}
       canEdit={!demo && !!sel && canEditPhoto(profile, sel)} onEdit={() => setEditing(sel)}
-      onDeleted={(id) => { setPhotos((ps) => ps.filter((x) => x.id !== id)); setSel(null); }} />
+      onDeleted={(id) => {
+        const rest = selPole?.photos.filter((x) => x.id !== id) ?? [];
+        setPhotos((ps) => ps.filter((x) => x.id !== id)); setSelId(rest.length ? pickMain(rest).id : null);
+      }} />
     {!demo && editing && <EditPhoto photo={editing} companies={companies} onClose={() => setEditing(null)}
-      onSaved={(np) => { setPhotos((ps) => ps.map((x) => (x.id === np.id ? np : x))); setSel(np); setEditing(null); }} />}
+      onSaved={(np) => { setPhotos((ps) => ps.map((x) => (x.id === np.id ? np : x))); setSelId(np.id); setEditing(null); }} />}
   </>;
 }
 
@@ -160,35 +177,80 @@ function uniq(v: (string | null)[]) {
   return [...new Set(v.filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
-function Sheet({ db, photo, onClose, company, pilot, canEdit, onEdit, onDeleted }: { db: SupabaseClient; photo: Photo | null; onClose: () => void; company: string; pilot: string;
+function Sheet({ db, pole, photo, onPick, onClose, company, pilot, canEdit, onEdit, onDeleted }: { db: SupabaseClient; pole: Pole | null; photo: Photo | null;
+  onPick: (id: string) => void; onClose: () => void; company: string; pilot: string;
   canEdit: boolean; onEdit: () => void; onDeleted: (id: string) => void }) {
-  const [thumb, setThumb] = useState<string | null>(null);
+  const [urls, setUrls] = useState<Record<string, string>>({}); // storage path -> signed URL (cached per session)
+  const urlsRef = useRef(urls); urlsRef.current = urls;
+  const [fullOk, setFullOk] = useState<string | null>(null);   // id whose full-res image finished loading
   const [confirmDel, setConfirmDel] = useState(false);
   const [delErr, setDelErr] = useState(''); const [deleting, setDeleting] = useState(false);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const touchX = useRef<number | null>(null);
   useEffect(() => { setConfirmDel(false); setDelErr(''); }, [photo?.id]);
-  const [full, setFull] = useState<string | null>(null);
-  useEffect(() => {
-    setThumb(null); setFull(null);
-    if (!photo) return;
-    let cancel = false;
-    const paths = [photo.storage_path, ...(photo.thumb_path ? [photo.thumb_path] : [])];
-    db.storage.from(BUCKET).createSignedUrls(paths, 3600).then(({ data }) => {
-      if (cancel || !data) return;
-      setFull(data[0]?.signedUrl ?? null);
-      setThumb(data[1]?.signedUrl ?? data[0]?.signedUrl ?? null);
+
+  const sign = (paths: string[]) => {
+    const need = [...new Set(paths)].filter((p) => !urlsRef.current[p]);
+    if (!need.length) return;
+    db.storage.from(BUCKET).createSignedUrls(need, 3600).then(({ data }) => {
+      if (!data) return;
+      setUrls((u) => ({ ...u, ...Object.fromEntries(data.filter((d) => d.signedUrl && d.path).map((d) => [d.path!, d.signedUrl as string])) }));
     });
-    return () => { cancel = true; };
-  }, [photo, db]);
+  };
+  // one batch for the whole pole's thumbnails + the selected photo's full image
+  useEffect(() => { if (pole) sign(pole.photos.map((p) => p.thumb_path ?? p.storage_path)); }, [pole?.id, pole?.photos.length, db]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (photo) sign([photo.storage_path]); }, [photo?.id, db]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const list = pole?.photos ?? (photo ? [photo] : []);
+  const idx = photo ? Math.max(0, list.findIndex((p) => p.id === photo.id)) : 0;
+  const go = (d: number) => { if (list.length > 1) onPick(list[(idx + d + list.length) % list.length].id); };
+
+  useEffect(() => { // keep the selected thumbnail in view
+    stripRef.current?.querySelector<HTMLElement>('.th.on')?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }, [photo?.id]);
+  useEffect(() => {
+    if (!photo) return;
+    const k = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.closest?.('input,textarea,select')) return;
+      if (e.key === 'ArrowRight') go(1); else if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
+  });
+
+  const full = photo ? urls[photo.storage_path] ?? null : null;
+  const thumb = photo ? urls[photo.thumb_path ?? photo.storage_path] ?? null : null;
   const s = photo?.severity ?? 'none';
+  const n = list.length;
   return <div className={'sheet' + (photo ? ' open' : '')}>
     <div className="grab" /><button className="x" onClick={onClose} aria-label="Close">✕</button>
     {photo && <>
-      <a className="photo tall" href={full ?? undefined} target="_blank" rel="noreferrer">
-        {thumb ? <img src={thumb} alt={photo.original_name ?? 'Inspection photo'} /> : 'Loading photo…'}
+      <div className="photo tall main" onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+        onTouchEnd={(e) => { const x0 = touchX.current; touchX.current = null; if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 45) go(dx < 0 ? 1 : -1); }}>
+        <a href={full ?? undefined} target="_blank" rel="noreferrer" className="mainlink">
+          {thumb || full ? <>
+            {thumb && <img src={thumb} alt={photo.original_name ?? 'Inspection photo'} />}
+            {full && <img key={photo.id} src={full} alt="" aria-hidden className={'hi' + (fullOk === photo.id ? ' on' : '')} onLoad={() => setFullOk(photo.id)} />}
+          </> : 'Loading photo…'}
+        </a>
         {s !== 'none' && <span className="bad" style={{ background: SEV_COLOR[s] }}>{SEV_LABEL[s].toUpperCase()}</span>}
-      </a>
+        <span className="ptag">{isNadir(photo) ? 'Nadir · top-down' : photo.is_thermal ? 'Thermal' : 'Side view'}</span>
+        {n > 1 && <>
+          <button className="nav l" onClick={() => go(-1)} aria-label="Previous photo">‹</button>
+          <button className="nav r" onClick={() => go(1)} aria-label="Next photo">›</button>
+          <span className="pcnt">{idx + 1} / {n}</span>
+        </>}
+      </div>
+      {n > 1 && <div className="strip" ref={stripRef} role="listbox" aria-label="Photos at this pole">
+        {list.map((p) => { const u = urls[p.thumb_path ?? p.storage_path]; return (
+          <button key={p.id} role="option" aria-selected={p.id === photo.id} className={'th' + (p.id === photo.id ? ' on' : '')} onClick={() => onPick(p.id)}
+            title={(p.issue || (p.severity === 'none' ? 'No issue' : SEV_LABEL[p.severity])) + (isNadir(p) ? ' · nadir' : '')}>
+            {u ? <img src={u} alt="" loading="lazy" /> : null}
+            {p.severity !== 'none' && <i className="sv" style={{ background: SEV_COLOR[p.severity] }} />}
+            {isNadir(p) ? <em>⬇</em> : p.is_thermal ? <em>IR</em> : null}
+          </button>); })}
+      </div>}
       <h3>{[photo.circuit, photo.territory].filter(Boolean).join(' · ') || 'Untagged location'}</h3>
-      <div className="sub">{company}</div>
+      <div className="sub">{company}{n > 1 ? ` · Pole with ${n} photos` : ''}</div>
       <div className="issue" style={{ color: s === 'none' ? '#9fd0f0' : SEV_COLOR[s], border: `1px solid ${SEV_COLOR[s]}`, background: SEV_COLOR[s] + '22' }}>
         <span className="dot" style={{ background: SEV_COLOR[s], margin: 0 }} />
         {photo.issue || (s === 'none' ? 'No issue found' : 'Issue')}{s !== 'none' ? ` — ${SEV_LABEL[s]}` : ''}
@@ -204,7 +266,7 @@ function Sheet({ db, photo, onClose, company, pilot, canEdit, onEdit, onDeleted 
       <div className="btns">
         {full && <a className="btn p" href={full} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Full photo</a>}
         {photo.has_gps && <a className="btn s" style={{ textDecoration: 'none', color: 'inherit' }} target="_blank" rel="noreferrer"
-          href={`https://www.google.com/maps/search/?api=1&query=${photo.lat},${photo.lng}`}>Directions</a>}
+          href={`https://www.google.com/maps/search/?api=1&query=${pole && isNadir(pole.main) ? `${pole.lat},${pole.lng}` : `${photo.lat},${photo.lng}`}`}>Directions</a>}
       </div>
       {canEdit && !confirmDel && <div className="btns">
         <button className="btn s" onClick={onEdit}>✏️ Edit</button>

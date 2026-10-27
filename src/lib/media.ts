@@ -1,22 +1,27 @@
 import exifr from 'exifr';
 
-export interface PhotoMeta { lat: number | null; lng: number | null; takenAt: Date | null }
+export interface PhotoMeta { lat: number | null; lng: number | null; takenAt: Date | null; pitch: number | null; thermal: boolean }
 
 export async function readMeta(file: File): Promise<PhotoMeta> {
   try {
-    const [gps, tags] = await Promise.all([
+    const [gps, tags, xmp] = await Promise.all([
       exifr.gps(file).catch(() => undefined),
       exifr.parse(file, ['DateTimeOriginal', 'CreateDate', 'ModifyDate']).catch(() => undefined),
+      // DJI drone metadata (XMP drone-dji:*): gimbal pitch (-90 = nadir) and which camera took it
+      exifr.parse(file, { xmp: true, tiff: false }).catch(() => undefined),
     ]);
+    const rawPitch = Number(xmp?.GimbalPitchDegree);
+    const pitch = Number.isFinite(rawPitch) && Math.abs(rawPitch) <= 180 ? rawPitch : null;
+    const thermal = xmp?.ImageSource === 'InfraredCamera' || /_T\.jpe?g$/i.test(file.name);
     const lat = gps && Number.isFinite(gps.latitude) ? gps.latitude : null;
     const lng = gps && Number.isFinite(gps.longitude) ? gps.longitude : null;
     const d = tags?.DateTimeOriginal ?? tags?.CreateDate ?? tags?.ModifyDate;
     const takenAt = d instanceof Date && !isNaN(d.getTime()) ? d : null;
     // (0,0) is almost always a bogus GPS fix
-    if (lat === 0 && lng === 0) return { lat: null, lng: null, takenAt };
-    return { lat, lng, takenAt };
+    if (lat === 0 && lng === 0) return { lat: null, lng: null, takenAt, pitch, thermal };
+    return { lat, lng, takenAt, pitch, thermal };
   } catch {
-    return { lat: null, lng: null, takenAt: null };
+    return { lat: null, lng: null, takenAt: null, pitch: null, thermal: false };
   }
 }
 
